@@ -94,6 +94,29 @@ describe("TicketService", () => {
     ).toThrow();
   });
 
+  it("rejects more infants than adults", () => {
+    expect(() =>
+      service.purchaseTickets(
+        1,
+        new TicketTypeRequest("ADULT", 1),
+        new TicketTypeRequest("INFANT", 2),
+      ),
+    ).toThrow();
+  });
+
+  it("allows equal number of infants and adults", () => {
+    expect(() =>
+      service.purchaseTickets(
+        1,
+        new TicketTypeRequest("ADULT", 2),
+        new TicketTypeRequest("INFANT", 2),
+      ),
+    ).not.toThrow();
+
+    expect(makePaymentMock).toHaveBeenCalledWith(1, 50); // 2 * 25
+    expect(reserveSeatMock).toHaveBeenCalledWith(1, 2); // Only 2 adults
+  });
+
   it("rejects more than 25 tickets", () => {
     expect(() =>
       service.purchaseTickets(1, new TicketTypeRequest("ADULT", 26)),
@@ -113,6 +136,16 @@ describe("TicketService", () => {
   it("rejects negative accountId", () => {
     expect(() =>
       service.purchaseTickets(-5, new TicketTypeRequest("ADULT", 1)),
+    ).toThrow();
+  });
+
+  it("rejects negative ticket quantity", () => {
+    expect(() =>
+      service.purchaseTickets(
+        1,
+        new TicketTypeRequest("ADULT", 3),
+        new TicketTypeRequest("INFANT", -2),
+      ),
     ).toThrow();
   });
 
