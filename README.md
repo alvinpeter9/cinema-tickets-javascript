@@ -4,14 +4,14 @@ A JavaScript application for managing cinema ticket purchases with validation, p
 
 ## Features
 
-- 🎫 Ticket purchase management (Adult, Child, Infant)
-- 💳 Payment processing integration
-- 🪑 Seat reservation system
-- ✅ Comprehensive input validation
-- 📝 Structured logging with Winston
-- 🧪 Unit tests with Vitest
-- 🔍 ESLint code quality checks
-- 🔒 Branch protection with automated PR checks
+- Ticket purchase management (Adult, Child, Infant)
+- Payment processing integration
+- Seat reservation system
+- Comprehensive input validation
+- Structured logging with Winston
+- Unit tests with Vitest
+- ESLint code quality checks
+- Branch protection with automated PR checks
 
 ## Requirements
 
