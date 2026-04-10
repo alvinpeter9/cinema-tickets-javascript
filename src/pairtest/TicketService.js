@@ -102,6 +102,13 @@ export default class TicketService {
       throw new InvalidPurchaseException("Invalid accountId");
     }
 
+    if (summary.ADULT < 0 || summary.CHILD < 0 || summary.INFANT < 0) {
+      logger.warn("Negative ticket quantity", { summary });
+      throw new InvalidPurchaseException(
+        "Ticket quantities cannot be less than zero",
+      );
+    }
+
     if (summary.total === 0) {
       logger.warn("No tickets requested");
       throw new InvalidPurchaseException("No tickets requested");
@@ -121,6 +128,13 @@ export default class TicketService {
       logger.warn("Child/Infant without Adult", { summary });
       throw new InvalidPurchaseException(
         "Child and Infant tickets require at least one Adult ticket",
+      );
+    }
+
+    if (summary.INFANT > summary.ADULT) {
+      logger.warn("More infants than adults", { summary });
+      throw new InvalidPurchaseException(
+        "Number of Infant tickets cannot exceed number of Adult tickets",
       );
     }
   }
