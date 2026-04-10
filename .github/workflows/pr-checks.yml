@@ -64,7 +64,7 @@ jobs:
       - name: Check for console logs
         run: |
           if grep -r "console\." src/ --include="*.js" | grep -v "// eslint-disable"; then
-            echo "❌ Found console statements in production code"
+            echo "❌ Found console statements in your code"
             exit 1
           fi
           echo "✓ No console statements found"
