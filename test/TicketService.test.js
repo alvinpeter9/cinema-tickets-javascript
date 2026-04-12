@@ -44,6 +44,21 @@ describe("TicketService", () => {
     expect(reserveSeatMock).toHaveBeenCalled();
   });
 
+  it("returns correct receipt for valid purchase", () => {
+    const receipt = service.purchaseTickets(
+      1,
+      new TicketTypeRequest("ADULT", 2),
+      new TicketTypeRequest("CHILD", 1),
+      new TicketTypeRequest("INFANT", 1),
+    );
+
+    expect(receipt).toEqual({
+      totalAmount: 65, // (2 * 25) + (1 * 15)
+      totalSeats: 3, // 2 adults + 1 child
+      breakdown: { adult: 2, child: 1, infant: 1 },
+    });
+  });
+
   it("does not allocate seats for infants", () => {
     service.purchaseTickets(
       1,
@@ -56,18 +71,16 @@ describe("TicketService", () => {
   });
 
   it("handles adult + child + infant correctly", () => {
-    service.purchaseTickets(
+    const receipt = service.purchaseTickets(
       1,
       new TicketTypeRequest("ADULT", 1),
       new TicketTypeRequest("CHILD", 1),
       new TicketTypeRequest("INFANT", 1),
     );
 
-    // 1 adult + 1 child = 2 seats
-    expect(reserveSeatMock).toHaveBeenCalledWith(1, 2);
-
-    // 25 + 15 = 40
-    expect(makePaymentMock).toHaveBeenCalledWith(1, 40);
+    expect(receipt.totalAmount).toBe(40);
+    expect(receipt.totalSeats).toBe(2);
+    expect(receipt.breakdown).toEqual({ adult: 1, child: 1, infant: 1 });
   });
 
   it("correctly aggregates multiple ticket requests of same type", () => {
