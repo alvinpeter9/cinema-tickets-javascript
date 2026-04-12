@@ -26,9 +26,6 @@ cd cinema-tickets-javascript
 
 # Install dependencies
 npm install
-
-# Try it out
-npm start
 ```
 
 ## Usage
