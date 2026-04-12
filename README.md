@@ -42,8 +42,8 @@ try {
     new TicketTypeRequest("CHILD", 1),
   ];
 
-  ticketService.purchaseTickets(123, ...ticketRequests);
-  console.log("Purchase successful!");
+  const receipt = ticketService.purchaseTickets(123, ...ticketRequests);
+  console.log("Purchase successful!", receipt);
 } catch (error) {
   console.error("Purchase failed:", error.message);
 }
@@ -140,12 +140,6 @@ Logs are written to:
 - **`logs/combined.log`**: All log levels
 - **`logs/error.log`**: Errors only
 
-Control log level:
-
-```bash
-LOG_LEVEL=debug npm start
-```
-
 ## Testing
 
 Tests are written with [Vitest](https://vitest.dev/):
@@ -174,11 +168,3 @@ This project uses GitHub Actions for automated testing and code quality checks o
 - ✅ Console statement detection
 
 Branch protection rules enforce passing all checks before merge.
-
-## Contributing
-
-1. Create a feature branch: `git checkout -b feature/your-feature`
-2. Commit changes: `git commit -am 'Add feature'`
-3. Push to branch: `git push origin feature/your-feature`
-4. Open a PR to `master`
-5. All checks must pass before merging

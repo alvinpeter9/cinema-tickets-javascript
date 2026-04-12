@@ -20,6 +20,12 @@ export default class TicketTypeRequest {
       throw new InvalidPurchaseException("noOfTickets must be an integer");
     }
 
+    if (noOfTickets < 0) {
+      throw new InvalidPurchaseException(
+        "noOfTickets cannot be less than zero",
+      );
+    }
+
     this.#type = type;
     this.#noOfTickets = noOfTickets;
   }

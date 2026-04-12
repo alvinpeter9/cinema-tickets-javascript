@@ -5,13 +5,21 @@ import SeatReservationService from "../thirdparty/seatbooking/SeatReservationSer
 import { logger } from "./util/logger.js";
 
 export default class TicketService {
-  static PRICES = {
+  // Maximum tickets allowed per transaction as per business rules
+  static #MAX_TICKETS = 25;
+
+  static #TICKET_TYPES = Object.freeze({
+    ADULT: "ADULT",
+    CHILD: "CHILD",
+    INFANT: "INFANT",
+  });
+
+  // Ticket prices as per business rules
+  static #PRICES = Object.freeze({
     ADULT: 25,
     CHILD: 15,
-    INFANT: 0,
-  };
-
-  static MAX_TICKETS = 25;
+    INFANT: 0, // Infants are free as they sit on an adult's lap
+  });
 
   constructor(
     paymentService = new TicketPaymentService(),
@@ -21,24 +29,143 @@ export default class TicketService {
     this.seatService = seatService;
   }
 
+  /**
+   * Validates, charges, and reserves seats for the given ticket requests.
+   *
+   * @param {number} accountId - Must be a positive integer greater than 0
+   * @param {...TicketTypeRequest} ticketTypeRequests
+   * @returns {{ totalAmount: number, totalSeats: number, breakdown: { adult: number, child: number, infant: number } }}
+   * @throws {InvalidPurchaseException} if validation fails or a service call errors
+   */
   purchaseTickets(accountId, ...ticketTypeRequests) {
-    // Step 1: Validate basic input
-    if (!ticketTypeRequests || ticketTypeRequests.length === 0) {
-      logger.error("No ticket requests provided");
-      throw new InvalidPurchaseException("No ticket requests provided");
-    }
+    this.#validateAccountId(accountId);
+    this.#validateRequestsProvided(ticketTypeRequests);
 
-    // Step 2: Aggregate requests
-    const summary = this.#aggregateTicketRequest(ticketTypeRequests);
+    const summary = this.#aggregateTicketRequests(ticketTypeRequests);
+    this.#validateBookingRules(summary);
 
-    // Step 3: Validate business rules
-    this.#validateBookingDetails(accountId, summary);
-
-    // Step 4: Calculate totals
     const totalAmount = this.#calculateAmount(summary);
     const totalSeats = this.#calculateSeats(summary);
 
-    // Step 5: External services (make payment and reserve seats)
+    this.#processPayment(accountId, totalAmount);
+    this.#reserveSeats(accountId, totalSeats);
+
+    logger.info("Ticket purchase completed successfully", { accountId });
+
+    return {
+      totalAmount,
+      totalSeats,
+      breakdown: {
+        adult: summary.ADULT,
+        child: summary.CHILD,
+        infant: summary.INFANT,
+      },
+    };
+  }
+
+  // ### Input Validation 
+
+  #validateAccountId(accountId) {
+    // Ensure accountId is a positive integer greater than 0
+    if (!Number.isInteger(accountId) || accountId <= 0) {
+      logger.warn("Invalid accountId", { accountId });
+      throw new InvalidPurchaseException("Invalid accountId");
+    }
+  }
+
+  #validateRequestsProvided(requests) {
+    if (!requests || requests.length === 0) {
+      logger.error("No ticket requests provided");
+      throw new InvalidPurchaseException("No ticket requests provided");
+    }
+  }
+
+  // ### Aggregation
+
+  #aggregateTicketRequests(requests) {
+    const summary = { ADULT: 0, CHILD: 0, INFANT: 0, total: 0 };
+
+    for (const req of requests) {
+      // Guard against null/undefined entries in addition to wrong types
+      if (!req || !(req instanceof TicketTypeRequest)) {
+        logger.error("Invalid ticket request object", { req });
+        throw new InvalidPurchaseException(
+          `Invalid ticket request: expected a TicketTypeRequest instance, got ${typeof req}`,
+        );
+      }
+
+      const type = req.getTicketType();
+      const quantity = req.getNoOfTickets();
+
+      summary[type] += quantity;
+      summary.total += quantity;
+    }
+
+    return summary;
+  }
+
+  // ### Business Rule Validation
+
+  #validateBookingRules(summary) {
+    this.#validateTicketLimit(summary.total);
+    this.#validateAdultPresent(summary);
+    this.#validateInfantAdultRatio(summary);
+  }
+
+  #validateTicketLimit(total) {
+    if (total > TicketService.#MAX_TICKETS) {
+      logger.warn("Ticket limit exceeded", {
+        requested: total,
+        max: TicketService.#MAX_TICKETS,
+      });
+      throw new InvalidPurchaseException(
+        `Cannot purchase more than ${TicketService.#MAX_TICKETS} tickets`,
+      );
+    }
+  }
+
+  #validateAdultPresent(summary) {
+    // Children and infants cannot attend unaccompanied — at least one adult required
+    const hasChildOrInfant = summary.CHILD > 0 || summary.INFANT > 0;
+    if (hasChildOrInfant && summary.ADULT === 0) {
+      logger.warn("Attempting to book child/Infant ticket without an Adult", {
+        summary,
+      });
+      throw new InvalidPurchaseException(
+        "Child and Infant tickets require at least one Adult ticket",
+      );
+    }
+  }
+
+  #validateInfantAdultRatio(summary) {
+    // Each infant must be seated on an adult's lap, so infants cannot outnumber adults
+    if (summary.INFANT > summary.ADULT) {
+      logger.warn("More Infants than Adults", { summary });
+      throw new InvalidPurchaseException(
+        "Number of Infant tickets cannot exceed number of Adult tickets",
+      );
+    }
+  }
+
+  // ### Calculations
+
+  #calculateAmount(summary) {
+    const { ADULT, CHILD, INFANT } = TicketService.#TICKET_TYPES;
+    return (
+      summary[ADULT] * TicketService.#PRICES[ADULT] +
+      summary[CHILD] * TicketService.#PRICES[CHILD] +
+      summary[INFANT] * TicketService.#PRICES[INFANT]
+    );
+  }
+
+  #calculateSeats(summary) {
+    // Infants sit on an adult's lap so no seat is reserved for them
+    return summary.ADULT + summary.CHILD;
+  }
+
+  // ### External Services Integration 
+
+  #processPayment(accountId, totalAmount) {
     try {
       logger.info("Processing payment", { accountId, totalAmount });
       this.paymentService.makePayment(accountId, totalAmount);
@@ -53,9 +180,11 @@ export default class TicketService {
         402,
       );
     }
+  }
 
+  #reserveSeats(accountId, totalSeats) {
     try {
-      logger.info("Reserving seat", { accountId, totalSeats });
+      logger.info("Reserving seats", { accountId, totalSeats });
       this.seatService.reserveSeat(accountId, totalSeats);
     } catch (error) {
       logger.error("Seat reservation failed", {
@@ -68,86 +197,5 @@ export default class TicketService {
         409,
       );
     }
-
-    logger.info("Ticket purchase completed successfully", { accountId });
-  }
-
-  #aggregateTicketRequest(requests) {
-    const summary = {
-      ADULT: 0,
-      CHILD: 0,
-      INFANT: 0,
-      total: 0,
-    };
-
-    for (const req of requests) {
-      if (!(req instanceof TicketTypeRequest)) {
-        logger.error("Invalid ticket request object", { req });
-        throw new InvalidPurchaseException("Invalid ticket request object");
-      }
-
-      const type = req.getTicketType();
-      const quantity = req.getNoOfTickets();
-
-      summary[type] += quantity;
-      summary.total += quantity;
-    }
-
-    return summary;
-  }
-
-  #validateBookingDetails(accountId, summary) {
-    if (!accountId || accountId <= 0) {
-      logger.warn("Invalid accountId", { accountId });
-      throw new InvalidPurchaseException("Invalid accountId");
-    }
-
-    if (summary.ADULT < 0 || summary.CHILD < 0 || summary.INFANT < 0) {
-      logger.warn("Negative ticket quantity", { summary });
-      throw new InvalidPurchaseException(
-        "Ticket quantities cannot be less than zero",
-      );
-    }
-
-    if (summary.total === 0) {
-      logger.warn("No tickets requested");
-      throw new InvalidPurchaseException("No tickets requested");
-    }
-
-    if (summary.total > TicketService.MAX_TICKETS) {
-      logger.warn("Ticket limit exceeded", {
-        requested: summary.total,
-        max: TicketService.MAX_TICKETS,
-      });
-      throw new InvalidPurchaseException(
-        `Cannot purchase more than ${TicketService.MAX_TICKETS} tickets`,
-      );
-    }
-
-    if ((summary.CHILD > 0 || summary.INFANT > 0) && summary.ADULT === 0) {
-      logger.warn("Child/Infant without Adult", { summary });
-      throw new InvalidPurchaseException(
-        "Child and Infant tickets require at least one Adult ticket",
-      );
-    }
-
-    if (summary.INFANT > summary.ADULT) {
-      logger.warn("More infants than adults", { summary });
-      throw new InvalidPurchaseException(
-        "Number of Infant tickets cannot exceed number of Adult tickets",
-      );
-    }
-  }
-
-  #calculateAmount(summary) {
-    return (
-      summary.ADULT * TicketService.PRICES.ADULT +
-      summary.CHILD * TicketService.PRICES.CHILD +
-      summary.INFANT * TicketService.PRICES.INFANT
-    );
-  }
-
-  #calculateSeats(summary) {
-    return summary.ADULT + summary.CHILD;
   }
 }
