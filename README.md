@@ -161,10 +161,10 @@ This project uses GitHub Actions for automated testing and code quality checks o
 
 **Checks include:**
 
-- ✅ Unit tests (Node 20.x, 22.x)
-- ✅ Code coverage
-- ✅ ESLint validation
-- ✅ Security audit
-- ✅ Console statement detection
+-  Unit tests (Node 20.x, 22.x)
+-  Code coverage
+-  ESLint validation
+-  Security audit
+-  Console statement detection
 
 Branch protection rules enforce passing all checks before merge.
