@@ -8,12 +8,6 @@ export default class TicketService {
   // Maximum tickets allowed per transaction as per business rules
   static #MAX_TICKETS = 25;
 
-  static #TICKET_TYPES = Object.freeze({
-    ADULT: "ADULT",
-    CHILD: "CHILD",
-    INFANT: "INFANT",
-  });
-
   // Ticket prices as per business rules
   static #PRICES = Object.freeze({
     ADULT: 25,
@@ -63,8 +57,7 @@ export default class TicketService {
     };
   }
 
-  // ### Input Validation 
-
+  // ### Input Validation
   #validateAccountId(accountId) {
     // Ensure accountId is a positive integer greater than 0
     if (!Number.isInteger(accountId) || accountId <= 0) {
@@ -81,7 +74,6 @@ export default class TicketService {
   }
 
   // ### Aggregation
-
   #aggregateTicketRequests(requests) {
     const summary = { ADULT: 0, CHILD: 0, INFANT: 0, total: 0 };
 
@@ -105,7 +97,6 @@ export default class TicketService {
   }
 
   // ### Business Rule Validation
-
   #validateBookingRules(summary) {
     this.#validateTicketLimit(summary.total);
     this.#validateAdultPresent(summary);
@@ -148,13 +139,11 @@ export default class TicketService {
   }
 
   // ### Calculations
-
   #calculateAmount(summary) {
-    const { ADULT, CHILD, INFANT } = TicketService.#TICKET_TYPES;
     return (
-      summary[ADULT] * TicketService.#PRICES[ADULT] +
-      summary[CHILD] * TicketService.#PRICES[CHILD] +
-      summary[INFANT] * TicketService.#PRICES[INFANT]
+      summary.ADULT * TicketService.#PRICES.ADULT +
+      summary.CHILD * TicketService.#PRICES.CHILD +
+      summary.INFANT * TicketService.#PRICES.INFANT
     );
   }
 
@@ -163,8 +152,7 @@ export default class TicketService {
     return summary.ADULT + summary.CHILD;
   }
 
-  // ### External Services Integration 
-
+  // ### External Services Integration
   #processPayment(accountId, totalAmount) {
     try {
       logger.info("Processing payment", { accountId, totalAmount });
